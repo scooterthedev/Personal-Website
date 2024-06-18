@@ -572,3 +572,186 @@ function aboutMenuListener() {
   });
 }
 
+function projectsMenuListener() {
+  // create project planes with textures
+  projects.forEach((project, i) => {
+    const colIndex = i % 3 === 0 ? 0 : 1;
+    const rowIndex = Math.floor(i / 3);
+    const geometry = new THREE.PlaneGeometry(0.71, 0.4);
+    const material = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      map: new THREE.TextureLoader().load(project.image),
+      transparent: true,
+      opacity: 0.0,
+    });
+    const projectPlane = new THREE.Mesh(geometry, material);
+    projectPlane.name = 'project';
+    projectPlane.userData = {
+      url: project.url,
+    };
+    projectPlane.position.set(
+      0.3 + i * 0.8 * colIndex,
+      1 - rowIndex * 0.5,
+      -1.15
+    );
+    projectPlane.scale.set(0, 0, 0);
+    // mesh & y vars needed for animation
+    projects[i].mesh = projectPlane;
+    projects[i].y = 1 - rowIndex * 0.5;
+    scene.add(projectPlane);
+  });
+
+  document
+    .getElementById('projects-menu')
+    .addEventListener('click', function (e) {
+      e.preventDefault();
+      disableOrbitControls();
+      resetBookCover();
+      gsap.to(camera.position, {
+        ...projectsCameraPos,
+        duration: 1.5,
+      });
+      gsap.to(camera.rotation, {
+        ...projectsCameraRot,
+        duration: 1.5,
+      });
+      gsap.delayedCall(1.5, enableCloseBtn);
+
+      // animate & show project items
+      projects.forEach((project, i) => {
+        project.mesh.scale.set(1, 1, 1);
+        gsap.to(project.mesh.material, {
+          opacity: 1,
+          duration: 1.5,
+          delay: 1.5 + i * 0.1,
+        });
+        gsap.to(project.mesh.position, {
+          y: project.y + 0.05,
+          duration: 1,
+          delay: 1.5 + i * 0.1,
+        });
+      });
+    });
+}
+
+function init3DWorldClickListeners() {
+  const mousePosition = new THREE.Vector2();
+  const raycaster = new THREE.Raycaster();
+  let intersects;
+
+  window.addEventListener('click', function (e) {
+    // store value set to prevent multi time update in foreach loop
+    const newTheme = theme === 'light' ? 'dark' : 'light';
+
+    // prevent about focus on button click which are positioned above book in mobile view
+    const closeBtn = document.getElementById('close-btn');
+    const projectsBtn = document.getElementById('projects-menu');
+    if (
+      e.target === closeBtn ||
+      closeBtn.contains(e.target) ||
+      e.target === projectsBtn ||
+      projectsBtn.contains(e.target)
+    ) {
+      return false;
+    }
+
+    mousePosition.x = (e.clientX / window.innerWidth) * 2 - 1;
+    mousePosition.y = -(e.clientY / window.innerHeight) * 2 + 1;
+    raycaster.setFromCamera(mousePosition, camera);
+    intersects = raycaster.intersectObjects(scene.children);
+    intersects.forEach((intersect) => {
+      if (intersect.object.name === 'project') {
+        intersect.object.userData.url &&
+          window.open(intersect.object.userData.url);
+      }
+
+      if (
+        intersect.object.name === 'Book' ||
+        intersect.object.name === 'Book001'
+      ) {
+        disableOrbitControls();
+        cameraToAbout();
+        gsap.delayedCall(1.5, enableCloseBtn);
+      }
+
+      if (
+        intersect.object.name === 'SwitchBoard' ||
+        intersect.object.name === 'Switch'
+      ) {
+        theme = newTheme;
+        switchTheme(theme);
+      }
+    });
+  });
+}
+
+// RESPONSIVE
+function initResponsive(roomScene) {
+  if (isMobile) {
+    roomScene.scale.set(0.95, 0.95, 0.95);
+    aboutCameraPos = {
+      x: 0.09,
+      y: 0.23,
+      z: 0.51,
+    };
+    aboutCameraRot = {
+      x: -1.57,
+      y: 0,
+      z: 1.57,
+    };
+
+    // rect light
+    // rectLight.width = 0.406;
+    // rectLight.height = 0.3;
+    // rectLight.position.z = -0.34;
+
+    // project
+    projectsCameraPos = {
+      x: 1.1,
+      y: 0.82,
+      z: 0.5,
+    };
+    projectsCameraRot = {
+      x: 0,
+      y: 0,
+      z: 1.55,
+    };
+    projects.forEach((project, i) => {
+      project.mesh.position.z = -1.13;
+    });
+
+    controls.maxDistance = 1.5;
+    controls.maxAzimuthAngle = Math.PI * 0.75;
+  }
+}
+
+// close button
+document.getElementById('close-btn').addEventListener('click', (e) => {
+  e.preventDefault();
+  resetCamera();
+});
+
+// contact menu
+document.getElementById('contact-btn').addEventListener('click', (e) => {
+  e.preventDefault();
+  document
+    .querySelector('.contact-menu__dropdown')
+    .classList.toggle('contact-menu__dropdown--open');
+});
+
+document.addEventListener('mouseup', (e) => {
+  const container = document.querySelector('.contact-menu');
+  if (!container.contains(e.target)) {
+    container
+      .querySelector('.contact-menu__dropdown')
+      .classList.remove('contact-menu__dropdown--open');
+  }
+});
+
+// update camera, renderer on resize
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
